@@ -1,0 +1,45 @@
+{
+  "summary": "Static code review of /app/auto_switch_play_to_main.py (OBS Studio native Python script). Verified thread-safety crash fix for OBS 32.2.1. Runtime execution not possible in container (obspython only available inside OBS). py_compile passes; architecture is correct.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "static_review_checks": {
+    "syntax_py_compile": "PASS - python3 -m py_compile succeeded",
+    "on_media_ended_callback_is_minimal": "PASS - Lines 37-39: only sets global _pending_switch=True. No obspython frontend/UI calls, no source lookups, no releases. Safe to run on secondary media thread.",
+    "scene_switch_deferred_to_script_tick": "PASS - Lines 46-67: obs_frontend_get_current_scene, obs_source_get_name, obs_frontend_set_current_scene, and obs_get_source_by_name all invoked exclusively inside script_tick, which OBS guarantees to run on the main (graphics/UI) thread each frame.",
+    "pending_switch_flag_reset_before_switch": "PASS - Line 50 sets _pending_switch=False BEFORE performing the switch, so a single media_ended event triggers exactly one switch (not one per frame).",
+    "only_when_play_active_evaluated_on_main_thread": "PASS - Lines 53-59: guard evaluated inside script_tick, not inside on_media_ended.",
+    "reference_counting": {
+      "obs_frontend_get_current_scene_released": "PASS - line 57 obs_source_release(current)",
+      "obs_get_source_by_name(main)_released": "PASS - line 64 obs_source_release(main_source)",
+      "obs_get_source_by_name(play)_released_in_connect": "PASS - line 97",
+      "obs_get_source_by_name(play)_released_in_disconnect": "PASS - line 125",
+      "obs_scene_enum_items_released_connect": "PASS - line 95 sceneitem_list_release(items)",
+      "obs_scene_enum_items_released_disconnect": "PASS - line 124 sceneitem_list_release(items)",
+      "obs_frontend_get_scenes_released": "PASS - line 155 source_list_release(scenes)"
+    },
+    "media_ended_signal_connection": "PASS - connect_play_media_sources iterates scene items, filters ffmpeg_source and vlc_source, and connects on_media_ended via signal_handler_connect. disconnect_all mirrors this.",
+    "no_frontend_api_in_secondary_thread_path": "PASS - Grep confirms obs_frontend_* calls appear only in script_tick, on_frontend_event, _populate_scene_list, script_load — all main-thread contexts. None reachable from on_media_ended."
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix is architecturally correct: media_ended callback is now a pure boolean flag set, and the actual frontend scene switch happens in script_tick on the main thread. This is the canonical OBS 32.x-safe pattern and should resolve the crash.",
+    "Minor observation (non-blocking): disconnect_all() re-enumerates scene items to disconnect; if the Play scene or its media sources were removed/renamed between connect and disconnect, some handlers could theoretically leak. Not a crash risk. Could be hardened by caching (source_weak_ref, handler) tuples at connect time.",
+    "Minor observation (non-blocking): script_load() only registers the frontend event callback and relies on OBS_FRONTEND_EVENT_FINISHED_LOADING to call connect_play_media_sources(). This is fine, since script_update() (invoked by OBS after script_defaults/settings load) also calls connect_play_media_sources(). No action needed.",
+    "Minor observation (non-blocking): if only_when_play_active is True and obs_frontend_get_current_scene() returns None, the code returns without switching. Acceptable defensive behavior."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (static review, 5/5 criteria pass)", "frontend": "N/A"},
+  "seed_data_creation": "N/A - standalone OBS script, no server/DB",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "This is a native OBS Studio Python script (obspython), not a web app. Runtime testing requires OBS Studio 32.2.1 on a desktop; container cannot import obspython. Only py_compile + static review are feasible here. The user should validate in OBS by: (1) loading the script via Tools->Scripts, (2) selecting Play and Main scenes, (3) switching to Play scene and letting a media source finish, (4) confirming OBS switches to Main without crashing.",
+  "rca of the issue": "Root cause of the OBS 32.2.1 crash: obs_frontend_set_current_scene() and obs_frontend_get_current_scene() were being invoked directly inside the media_ended signal callback. OBS media signals fire on a secondary (media/graphics) thread; frontend/UI APIs in OBS 32.x require the main thread and now assert/deadlock when called off-thread. Mitigation implemented in this version: the media_ended callback (on_media_ended) does nothing but set a boolean _pending_switch=True. The heavy lifting (querying current scene, checking only_when_play_active, and setting the new scene) is deferred to script_tick(seconds), which OBS invokes on the main thread every frame. The flag is cleared before the switch so it fires exactly once per media-ended event. All obs_source_* / list_* handles obtained are released. Reproduction (in OBS): before fix — add a media source to 'Play' scene, switch to Play, wait for media end -> OBS crashes. After fix — same steps -> OBS smoothly switches to Main."
+}

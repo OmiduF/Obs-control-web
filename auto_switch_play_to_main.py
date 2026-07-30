@@ -24,12 +24,32 @@ only_when_play_active = True  # comuta doar daca scena Play e cea live
 # lista handler-elor conectate, ca sa le putem deconecta la reload
 _connected_handlers = []
 
+# flag setat din callback-ul media_ended (thread secundar) si consumat
+# in script_tick (thread principal). NU comuta scena direct in callback:
+# in OBS 32.x asta provoaca crash/deadlock.
+_pending_switch = False
+
 
 # ------------------------------------------------------------------
-# Callback apelat cand un media source si-a terminat redarea
+# Callback apelat cand un media source si-a terminat redarea.
+# IMPORTANT: ruleaza pe thread secundar -> facem doar minimul (setam flag).
 # ------------------------------------------------------------------
 def on_media_ended(calldata):
-    # daca vrem sa comutam doar cand Play e scena curenta
+    global _pending_switch
+    _pending_switch = True
+
+
+# ------------------------------------------------------------------
+# Ruleaza pe thread-ul principal la fiecare frame. Aici e sigur sa
+# apelam functiile de frontend (comutarea scenei).
+# ------------------------------------------------------------------
+def script_tick(seconds):
+    global _pending_switch
+    if not _pending_switch:
+        return
+    _pending_switch = False
+
+    # comuta doar cand scena Play e cea live (verificat pe thread principal)
     if only_when_play_active:
         current = obs.obs_frontend_get_current_scene()
         if current is not None:
@@ -38,7 +58,6 @@ def on_media_ended(calldata):
             if current_name != play_scene_name:
                 return
 
-    # gaseste sursa scenei Main si comuta pe ea
     main_source = obs.obs_get_source_by_name(main_scene_name)
     if main_source is not None:
         obs.obs_frontend_set_current_scene(main_source)
