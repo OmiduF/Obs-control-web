@@ -39,6 +39,30 @@ Dacă adaugi sau schimbi surse media în scena Play, apasă butonul **„Reînca
 
 Deschide **Tools → Scripts → Script Log** pentru a vedea ce surse media sunt monitorizate și eventuale avertismente (ex. scenă negăsită).
 
+## Varianta externă (recomandată dacă folosești Aitum Vertical / Multistream)
+
+Fișier: [`obs_autoswitch_ws.py`](obs_autoswitch_ws.py)
+
+Rulează **în afara OBS**, prin OBS WebSocket, deci **nu poate face crash la OBS** și e imună la conflictele cu plugin-uri (Aitum Vertical Canvas, Multistream etc.).
+
+### Cerințe
+- În OBS: **Tools → WebSocket Server Settings → Enable WebSocket server** (notează portul și parola din „Show Connect Info”).
+- Python 3 + libraria:
+  ```bash
+  pip install obsws-python
+  ```
+
+### Configurare și rulare
+1. Deschide `obs_autoswitch_ws.py` și completează secțiunea SETĂRI:
+   - `PORT`, `PASSWORD` (din OBS WebSocket)
+   - `PLAY_SCENE`, `MAIN_SCENE`, `MEDIA_SOURCE` (numele exacte din OBS)
+   Alternativ, poți folosi variabile de mediu: `OBS_PORT`, `OBS_PASSWORD`, `OBS_PLAY_SCENE`, `OBS_MAIN_SCENE`, `OBS_MEDIA_SOURCE`.
+2. Rulează:
+   ```bash
+   python obs_autoswitch_ws.py
+   ```
+3. Lasă fereastra deschisă cât timp streamezi. Se reconectează automat dacă pică legătura.
+
 ## Licență
 
 [MIT](LICENSE)
