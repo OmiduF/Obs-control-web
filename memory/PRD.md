@@ -32,6 +32,14 @@ Utilizatorul vrea ca atunci când un material media din scena **Play** se termin
    - Ascultă `MediaInputPlaybackEnded`, verifică sursa/scena, apoi `SetCurrentProgramScene(Main)`.
    - Frontend-only (fără backend/DB). Nu testat runtime cu OBS live (mediu fără OBS); UI validat prin screenshot.
 
+3. **Panou web unificat cu tab-uri** (`frontend/src`) — „OBS Control Deck".
+   - Conexiune unică partajată (`obs/ObsProvider.js`): host/port/parolă, suport **IP din rețea**, dispecer central pentru evenimentul `MediaInputPlaybackEnded`, log partajat, refresh scene/surse.
+   - **Tab Auto Switch** (`components/AutoSwitchTab.js`): mai multe reguli „sursă media → scenă" (adaugă/șterge), buton Arm.
+   - **Tab Timer** (`components/TimerTab.js`): countdown MM:SS, opțional scrie în sursă text OBS; la final → scena INTRO; când media din INTRO se termină → MAIN.
+   - **Tab Materiale** (`components/MaterialsTab.js`): media din scena MATERIALE se termină → MAIN; buton „Start material" (comută pe MATERIALE + restart media prin `TriggerMediaInputAction`); opțiune „doar când MATERIALE e live".
+   - `components/ConnectionBar.js`, `components/LogPanel.js`. Toate setările persistate în localStorage.
+   - Frontend-only. Compilează curat; UI validat prin screenshot. Interacțiunea reală cu OBS necesită testul utilizatorului (mediu fără OBS).
+
 ## Backlog / next
 - Delay configurabil înainte de comutare.
 - Suport pentru mai multe surse media / scene Play.
