@@ -26,6 +26,12 @@ Utilizatorul vrea ca atunci când un material media din scena **Play** se termin
 ## Status
 - Varianta externă: validată static (import lib, semnături metode, mapare eveniment `on_media_input_playback_ended`). Rularea live în OBS nu e posibilă în acest mediu — necesită testul utilizatorului.
 
+3. **Pagină web** (`frontend/src/App.js` + `App.css`) — panou de control în browser.
+   - Se conectează direct la OBS WebSocket din browser folosind `obs-websocket-js` (v5.0.8).
+   - Formular conexiune (host/port/parolă), dropdown-uri populate din OBS (scene + surse media ffmpeg/vlc), toggle „doar când Play e live”, delay configurabil, buton Arm/Pornire, log de activitate, contor comutări. Setări persistate în localStorage.
+   - Ascultă `MediaInputPlaybackEnded`, verifică sursa/scena, apoi `SetCurrentProgramScene(Main)`.
+   - Frontend-only (fără backend/DB). Nu testat runtime cu OBS live (mediu fără OBS); UI validat prin screenshot.
+
 ## Backlog / next
 - Delay configurabil înainte de comutare.
 - Suport pentru mai multe surse media / scene Play.
