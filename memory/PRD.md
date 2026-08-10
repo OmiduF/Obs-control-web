@@ -51,3 +51,10 @@ Utilizatorul vrea ca atunci când un material media din scena **Play** se termin
 - Ruleaza pe http://localhost:8080 (port configurabil ca argument), deschide browserul automat. Contine toate 3 tab-urile (Auto Switch multi-reguli, Timer countdown->INTRO->MAIN, Materiale->MAIN). Persistenta in localStorage.
 - Testat: HTTP 200, 23KB, markeri prezenti. Conexiunea reala la OBS necesita test la utilizator.
 - Exista si `obs_control.html` (varianta file://) si varianta React pe preview Emergent.
+
+## Update - Timer overlay (Browser Source pt OBS)
+- Adaugat in obs_control_server.py: stare timer partajata pe server (TIMER + lock), rute GET /overlay (pagina transparenta care afiseaza countdown), GET/POST /api/timer (sincronizare intre panoul de control si OBS Browser Source, procese/browsere separate).
+- Server trecut pe ThreadingHTTPServer (polling + control concurent). Overlay poll la 300ms; parametri optionali ?color=&size=&hide=1.
+- Panoul Timer: la Start/Stop/Reset trimite POST /api/timer; afiseaza si linkul overlay (location.origin + /overlay).
+- Verificat via curl: rutele, start/stop, scaderea numaratorii (10->7 in 3s). Randarea in OBS Browser Source = test la utilizator.
+- Materiale lasate ca inainte (la cererea utilizatorului "restul sunt ok").

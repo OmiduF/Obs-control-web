@@ -21,6 +21,8 @@ import socketserver
 import threading
 import webbrowser
 import sys
+import json
+import time
 
 PORT = 8080
 if len(sys.argv) > 1:
@@ -176,6 +178,7 @@ HTML = r'''<!DOCTYPE html>
       <button id="tStop" class="btn ghost" style="display:none">Stop</button>
       <button id="tReset" class="btn mini arm" style="flex:none">Reset</button>
     </div>
+    <p class="desc" style="margin-top:16px">Overlay pentru OBS (adauga ca <b>Browser Source</b>, bifeaza fundal transparent): <span id="overlayUrl" style="color:var(--accent)"></span><br/><span style="font-size:11px">Optional in link: <b>?color=%23ffcc4d&amp;size=160&amp;hide=1</b> (culoare / marime / ascunde cand nu ruleaza)</span></p>
   </div>
 
   <div class="card panel" id="panel-materials">
@@ -369,10 +372,12 @@ mediaSubs.push(function(name){
 var tInterval=null, tRemaining=0, tWaitingIntro=false;
 function fmt(s){ s=Math.max(0,s); return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); }
 function renderTimer(){ $("tDisplay").textContent=fmt(tRemaining); }
+function postTimer(seconds,stop){ try{ fetch("/api/timer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(stop?{action:"stop"}:{action:"start",duration:seconds})}); }catch(e){} }
 async function pushText(t){ var ts=$("tText").value; if(!ts) return; try{ await req("SetInputSettings",{inputName:ts,inputSettings:{text:t}}); }catch(e){} }
 $("tStart").onclick=function(){
   var total=(+$("tMin").value||0)*60+(+$("tSec").value||0);
   if(total<=0) return;
+  postTimer(total,false);
   clearInterval(tInterval); tRemaining=total; renderTimer(); pushText(fmt(total));
   $("tStart").style.display="none"; $("tStop").style.display="inline-flex"; tWaitingIntro=false;
   log("[Timer] Pornit "+fmt(total)+".");
@@ -381,12 +386,12 @@ $("tStart").onclick=function(){
     if(tRemaining<=0){
       clearInterval(tInterval); tInterval=null;
       $("tStart").style.display="inline-flex"; $("tStop").style.display="none";
-      log("[Timer] Gata -> comut pe INTRO.","event"); switchScene($("tIntro").value); tWaitingIntro=true;
+      log("[Timer] Gata -> comut pe INTRO.","event"); switchScene($("tIntro").value); tWaitingIntro=true; postTimer(0,true);
     }
   },1000);
 };
-$("tStop").onclick=function(){ clearInterval(tInterval); tInterval=null; tWaitingIntro=false; $("tStart").style.display="inline-flex"; $("tStop").style.display="none"; };
-$("tReset").onclick=function(){ clearInterval(tInterval); tInterval=null; tWaitingIntro=false; tRemaining=(+$("tMin").value||0)*60+(+$("tSec").value||0); renderTimer(); $("tStart").style.display="inline-flex"; $("tStop").style.display="none"; };
+$("tStop").onclick=function(){ clearInterval(tInterval); tInterval=null; tWaitingIntro=false; $("tStart").style.display="inline-flex"; $("tStop").style.display="none"; postTimer(0,true); };
+$("tReset").onclick=function(){ clearInterval(tInterval); tInterval=null; tWaitingIntro=false; tRemaining=(+$("tMin").value||0)*60+(+$("tSec").value||0); renderTimer(); $("tStart").style.display="inline-flex"; $("tStop").style.display="none"; postTimer(0,true); };
 mediaSubs.push(function(name){
   if(!tWaitingIntro) return;
   var im=$("tMedia").value; if(im && name!==im) return;
@@ -447,6 +452,7 @@ $("mOnlyLive").addEventListener("change",saveState);
   if(_savedRules&&_savedRules.length){ _savedRules.forEach(function(r){ addRule(r.src,r.tgt); }); }
   else { addRule(); }
   renderTimer();
+  if($("overlayUrl")) $("overlayUrl").textContent = location.origin + "/overlay";
 })();
 </script>
 </body>
@@ -454,14 +460,90 @@ $("mOnlyLive").addEventListener("change",saveState);
 '''
 
 
+OVERLAY_HTML = r'''<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8" />
+<title>Timer Overlay</title>
+<style>
+  html,body{margin:0;height:100%;background:transparent;overflow:hidden}
+  #wrap{display:flex;align-items:center;justify-content:center;height:100vh}
+  #t{font-family:"Segoe UI",Arial,Helvetica,sans-serif;font-weight:800;font-size:120px;
+     color:#23e5a4;letter-spacing:3px;font-variant-numeric:tabular-nums;
+     text-shadow:0 4px 24px rgba(0,0,0,.65), 0 0 40px rgba(35,229,164,.4);
+     transition:opacity .3s}
+  .hidden{opacity:0}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="t">00:00</div></div>
+<script>
+var params=new URLSearchParams(location.search);
+var el=document.getElementById("t");
+if(params.get("color")) el.style.color=params.get("color");
+if(params.get("size")) el.style.fontSize=parseInt(params.get("size"),10)+"px";
+var hideZero = params.get("hide")==="1";
+function fmt(s){s=Math.max(0,s);return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
+async function tick(){
+  try{
+    var r=await fetch("/api/timer",{cache:"no-store"});
+    var d=await r.json();
+    el.textContent=fmt(d.remaining||0);
+    if(hideZero){ el.classList.toggle("hidden", !d.running); }
+  }catch(e){}
+}
+setInterval(tick,300); tick();
+</script>
+</body>
+</html>
+'''
+
+TIMER = {"running": False, "end": 0.0}
+TIMER_LOCK = threading.Lock()
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        body = HTML.encode("utf-8")
+    def _send(self, body, content_type):
+        data = body.encode("utf-8") if isinstance(body, str) else body
         self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(body)
+        self.wfile.write(data)
+
+    def do_GET(self):
+        path = self.path.split("?")[0]
+        if path == "/overlay":
+            self._send(OVERLAY_HTML, "text/html; charset=utf-8")
+        elif path == "/api/timer":
+            with TIMER_LOCK:
+                running = TIMER["running"]
+                remaining = max(0, int(round(TIMER["end"] - time.time()))) if running else 0
+            self._send(json.dumps({"running": running, "remaining": remaining}), "application/json")
+        else:
+            self._send(HTML, "text/html; charset=utf-8")
+
+    def do_POST(self):
+        path = self.path.split("?")[0]
+        if path == "/api/timer":
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                data = json.loads(raw.decode("utf-8") or "{}")
+            except Exception:
+                data = {}
+            with TIMER_LOCK:
+                if data.get("action") == "start":
+                    TIMER["running"] = True
+                    TIMER["end"] = time.time() + float(data.get("duration", 0))
+                else:
+                    TIMER["running"] = False
+                    TIMER["end"] = 0.0
+            self._send(json.dumps({"ok": True}), "application/json")
+        else:
+            self.send_response(404)
+            self.end_headers()
 
     def log_message(self, *args):
         pass
@@ -470,7 +552,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 def main():
     url = "http://localhost:%d" % PORT
     try:
-        httpd = socketserver.TCPServer(("127.0.0.1", PORT), Handler)
+        httpd = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     except OSError as e:
         print("Nu am putut porni pe portul %d (%s)." % (PORT, e))
         print("Incearca alt port:  python obs_control_server.py 9000")
@@ -478,6 +560,7 @@ def main():
 
     print("=" * 52)
     print(" OBS Control Deck ruleaza la:  %s" % url)
+    print(" Timer overlay (Browser Source): %s/overlay" % url)
     print(" Lasa aceasta fereastra deschisa. Ctrl+C = stop.")
     print("=" * 52)
     threading.Timer(1.0, lambda: webbrowser.open(url)).start()
