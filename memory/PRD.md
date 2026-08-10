@@ -44,3 +44,10 @@ Utilizatorul vrea ca atunci când un material media din scena **Play** se termin
 - Delay configurabil înainte de comutare.
 - Suport pentru mai multe surse media / scene Play.
 - Împachetare ca executabil (.exe / .app) ca să nu fie nevoie de Python instalat.
+
+## Update - server local (obs_control_server.py)
+- Utilizatorul vrea sa ruleze panoul local pe PC (localhost), nu pe Emergent.
+- Livrat `obs_control_server.py`: server Python cu HTML embed (vanilla JS, client OBS WebSocket v5 implementat manual: Hello/Identify cu auth SHA256 via crypto.subtle, Request/Response, event MediaInputPlaybackEnded).
+- Ruleaza pe http://localhost:8080 (port configurabil ca argument), deschide browserul automat. Contine toate 3 tab-urile (Auto Switch multi-reguli, Timer countdown->INTRO->MAIN, Materiale->MAIN). Persistenta in localStorage.
+- Testat: HTTP 200, 23KB, markeri prezenti. Conexiunea reala la OBS necesita test la utilizator.
+- Exista si `obs_control.html` (varianta file://) si varianta React pe preview Emergent.
