@@ -24,7 +24,7 @@ import sys
 import json
 import time
 
-PORT = 8080
+PORT = None
 if len(sys.argv) > 1:
     try:
         PORT = int(sys.argv[1])
@@ -550,14 +550,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 def main():
-    url = "http://localhost:%d" % PORT
-    try:
-        httpd = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    except OSError as e:
-        print("Nu am putut porni pe portul %d (%s)." % (PORT, e))
-        print("Incearca alt port:  python obs_control_server.py 9000")
+    # Porturi de incercat: intai cel dat ca argument (daca exista), apoi lista de rezerve.
+    candidates = []
+    if PORT:
+        candidates.append(PORT)
+    for p in [8080, 8090, 8123, 8770, 8888, 9000, 9090, 5599, 7788, 3939, 6060]:
+        if p not in candidates:
+            candidates.append(p)
+
+    httpd = None
+    chosen = None
+    for p in candidates:
+        try:
+            httpd = http.server.ThreadingHTTPServer(("127.0.0.1", p), Handler)
+            chosen = p
+            break
+        except OSError as e:
+            print("Portul %d indisponibil (%s). Incerc altul..." % (p, e))
+
+    if httpd is None:
+        print("Nu am gasit niciun port liber. Ruleaza cu un port ales de tine, ex.:")
+        print("   python obs_control_server.py 5050")
         sys.exit(1)
 
+    url = "http://localhost:%d" % chosen
     print("=" * 52)
     print(" OBS Control Deck ruleaza la:  %s" % url)
     print(" Timer overlay (Browser Source): %s/overlay" % url)
