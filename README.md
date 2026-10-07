@@ -1,68 +1,193 @@
-# OBS Auto Switch: Play → Main
+# OBS Control Web
 
-Script pentru **OBS Studio** care comută automat pe scena **Main** atunci când un fișier media (video/audio) din scena **Play** ajunge la final.
+### OBS Studio automation tools for live production and streaming
 
-Funcționează pe **Windows** și **macOS** (și Linux), nativ prin API-ul de scripting Python al OBS — fără WebSocket.
+A collection of automation tools for **OBS Studio**, focused on reliable scene switching and media playback workflows.
 
-## Funcționalități
+The project includes both a **native OBS Python script** and an **external OBS WebSocket implementation**, allowing automatic switching from a `Play` scene back to a `Main` scene when a media file finishes playing.
 
-- Detectează când un material media se termină în scena aleasă și comută automat pe scena principală.
-- Suportă atât **Media Source** (`ffmpeg_source`) cât și **VLC Video Source** (`vlc_source`).
-- Nume de scene configurabile din interfața OBS (liste derulante).
-- Opțiune: comută doar când scena „Play” este cea live.
-- Buton pentru reîncărcarea surselor media.
-- Se reconectează automat când se schimbă lista de scene sau colecția.
+It was created for practical live-production workflows where media playback needs to be followed automatically by a return to the main production scene.
 
-## Cerințe
+---
 
-- OBS Studio (cu suport Python).
-- Python 3 instalat (Python 3.6+ recomandat).
+## 🎬 OBS Auto Switch: Play → Main
 
-## Instalare
+The main tool automatically switches OBS from a **Play** scene to a **Main** scene when the media currently playing reaches the end.
 
-1. Descarcă fișierul [`auto_switch_play_to_main.py`](auto_switch_play_to_main.py).
-2. În OBS: **Tools → Scripts**.
-3. Tab **Python Settings** → setează calea către instalarea Python (o singură dată).
-4. Tab **Scripts** → apasă **„+”** și selectează `auto_switch_play_to_main.py`.
-5. În panoul din dreapta:
-   - **Scena Play (sursa)** → alege scena cu materialul media.
-   - **Scena Main (destinație)** → alege scena principală.
-   - Opțional: bifează *„Comută doar când Play este live”*.
+It supports:
 
-## Utilizare
+- Media Source (`ffmpeg_source`)
+- VLC Video Source (`vlc_source`)
+- Configurable Play and Main scenes
+- Optional switching only when the Play scene is live
+- Media source reload
+- Automatic reconnection when scenes or collections change
 
-Redă un material media în scena **Play**. Când acesta se termină, OBS comută automat pe scena **Main**.
+---
 
-Dacă adaugi sau schimbi surse media în scena Play, apasă butonul **„Reîncarcă sursele media”**.
+## 🐍 Native OBS Python Script
 
-## Depanare
+The native version runs directly inside OBS Studio using its Python scripting support.
 
-Deschide **Tools → Scripts → Script Log** pentru a vedea ce surse media sunt monitorizate și eventuale avertismente (ex. scenă negăsită).
+### Installation
 
-## Varianta externă (recomandată dacă folosești Aitum Vertical / Multistream)
+1. Download `auto_switch_play_to_main.py`.
+2. Open **OBS Studio → Tools → Scripts**.
+3. Go to **Python Settings** and select your Python installation.
+4. Go to **Scripts** and press `+`.
+5. Select `auto_switch_play_to_main.py`.
+6. Configure the Play and Main scenes from the script interface.
 
-Fișier: [`obs_autoswitch_ws.py`](obs_autoswitch_ws.py)
+### Usage
 
-Rulează **în afara OBS**, prin OBS WebSocket, deci **nu poate face crash la OBS** și e imună la conflictele cu plugin-uri (Aitum Vertical Canvas, Multistream etc.).
+Play a media file in the configured Play scene.
 
-### Cerințe
-- În OBS: **Tools → WebSocket Server Settings → Enable WebSocket server** (notează portul și parola din „Show Connect Info”).
-- Python 3 + libraria:
-  ```bash
-  pip install obsws-python
-  ```
+When the media finishes, OBS automatically switches to the configured Main scene.
 
-### Configurare și rulare
-1. Deschide `obs_autoswitch_ws.py` și completează secțiunea SETĂRI:
-   - `PORT`, `PASSWORD` (din OBS WebSocket)
-   - `PLAY_SCENE`, `MAIN_SCENE`, `MEDIA_SOURCE` (numele exacte din OBS)
-   Alternativ, poți folosi variabile de mediu: `OBS_PORT`, `OBS_PASSWORD`, `OBS_PLAY_SCENE`, `OBS_MAIN_SCENE`, `OBS_MEDIA_SOURCE`.
-2. Rulează:
-   ```bash
-   python obs_autoswitch_ws.py
-   ```
-3. Lasă fereastra deschisă cât timp streamezi. Se reconectează automat dacă pică legătura.
+If media sources are added or changed, use the **Reload Media Sources** button.
 
-## Licență
+---
 
-[MIT](LICENSE)
+## 🌐 External OBS WebSocket Version
+
+An alternative implementation is available as:
+
+`obs_autoswitch_ws.py`
+
+This version runs **outside OBS Studio** and communicates through the OBS WebSocket API.
+
+This approach can be useful when running OBS with additional plugins such as **Aitum Vertical** or multistreaming setups.
+
+Because the automation runs externally, it is isolated from the OBS scripting environment and can reconnect automatically if the WebSocket connection is interrupted.
+
+### Requirements
+
+- OBS Studio
+- OBS WebSocket server enabled
+- Python 3
+- `obsws-python`
+
+Install the Python library:
+
+```bash
+pip install obsws-python
+```
+
+### Configuration
+
+Configure the following values in `obs_autoswitch_ws.py`:
+
+- `PORT`
+- `PASSWORD`
+- `PLAY_SCENE`
+- `MAIN_SCENE`
+- `MEDIA_SOURCE`
+
+Alternatively, environment variables can be used:
+
+```text
+OBS_PORT
+OBS_PASSWORD
+OBS_PLAY_SCENE
+OBS_MAIN_SCENE
+OBS_MEDIA_SOURCE
+```
+
+### Run
+
+```bash
+python obs_autoswitch_ws.py
+```
+
+Leave the application running while OBS is being used. The script automatically reconnects if the connection is interrupted.
+
+---
+
+## 🖥️ Supported Platforms
+
+The native OBS Python implementation is designed to work with:
+
+- Windows
+- macOS
+- Linux
+
+The external WebSocket implementation can run on any platform supported by Python and OBS WebSocket.
+
+---
+
+## 🎥 Typical Production Workflow
+
+A typical workflow looks like this:
+
+```text
+                 OBS Studio
+                     │
+                     ▼
+              ┌─────────────┐
+              │    PLAY     │
+              │    SCENE    │
+              └──────┬──────┘
+                     │
+                Media plays
+                     │
+                     ▼
+                Media ends
+                     │
+                     ▼
+              ┌─────────────┐
+              │    MAIN     │
+              │    SCENE    │
+              └─────────────┘
+```
+
+This is particularly useful for:
+
+- Live streaming
+- Sports production
+- Broadcast automation
+- Studio production
+- Playout workflows
+- Aitum Vertical workflows
+- Multistreaming
+
+---
+
+## 🤖 Development
+
+The project was developed from a practical live-production requirement and with assistance from **Emergent**, an AI-assisted development environment.
+
+The focus is on simple automation that can be integrated into existing OBS workflows without requiring a large production system.
+
+---
+
+## 📁 Project Structure
+
+```text
+Obs-control-web/
+├── backend/
+├── frontend/
+├── tests/
+├── test_reports/
+├── auto_switch_play_to_main.py
+├── obs_autoswitch_ws.py
+├── obs_control.html
+├── obs_control_server.py
+├── requirements-ws.txt
+├── start_windows.bat
+├── README.md
+└── test_result.md
+```
+
+---
+
+## 📜 License
+
+This project is released under the **MIT License**.
+
+---
+
+## 👤 Author
+
+**OmiduF**
+
+Built for real-world OBS Studio and live-production workflows.
